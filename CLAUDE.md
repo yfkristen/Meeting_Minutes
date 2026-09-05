@@ -5,11 +5,17 @@
 ## 目錄結構
 
 ```
-transcripts/   會議錄音的逐字稿原文（使用者提供，原封不動保存）
-minutes/       Claude 產出的會議記錄（草稿與定稿）
+transcripts/   會議逐字稿原文（使用者提供，原封不動保存）
+minutes/       會議正式稿（Markdown，草稿與定稿）
+output/word/   由正式稿產出的 Word 會議紀錄（.docx）
+output/excel/  由正式稿產出的個案進度表（.xlsx）
 reference/     已定稿的範例配對（逐字稿 + 最終版會議記錄），作為格式與風格的依據
 templates/     會議記錄格式範本
+scripts/       Markdown → Word / Excel 的產出腳本
 ```
+
+- 逐字稿放 `transcripts/`、正式稿放 `minutes/`，兩者同檔名配對。
+- `minutes/` 的 Markdown 是「唯一事實來源」，Word 與 Excel 都由它產生；要改內容改 Markdown 再重跑腳本，不要直接改 Word。
 
 ## 工作流程
 
@@ -27,6 +33,10 @@ templates/     會議記錄格式範本
    - 將逐字稿存入 `transcripts/`
    - **先閱讀 `reference/` 內所有範例配對與 `templates/meeting_minutes_template.md`**，掌握格式與風格
    - 產出會議記錄存入 `minutes/`，並在對話中完整呈現給使用者
+   - 產出兩份交付檔（每次都要產，除非使用者說不用）：
+     - Word 會議紀錄：`python3 scripts/md_to_docx.py minutes/<檔名>.md` → `output/word/<檔名>_會議紀錄.docx`
+     - Excel 個案進度表：`python3 scripts/make_progress_xlsx.py minutes/<檔名>.md` → `output/excel/<檔名>_個案進度.xlsx`
+   - 用 SendUserFile 把兩個檔案傳給使用者
 3. 若使用者有修改，將修改後版本視為新的最終版，回到階段一第 3–4 步持續校準
 
 ## 固定會議資訊
@@ -76,3 +86,11 @@ templates/     會議記錄格式範本
 10. 逐字稿為語音辨識結果，含同音錯字（如 SAK/SAKE=Slack、TS=Teams、TR=Trae、繳卷=繳交、治安=資安），產出時須依上下文校正為正確詞彙。
 
 > 收到後續會議的新定稿時，於 `reference/` 新增配對並補充或修訂本節。
+
+## 交付檔產出（Word / Excel）
+
+- 環境需求：`pip install python-docx openpyxl`
+- Word 版面設定（字型、字級、行距）集中在 `scripts/md_to_docx.py` 檔頭常數，要調整改那裡即可。
+- Excel 取 `minutes/` 中「各案進度」章節的編號項目，逐項拆成：編號、個案名稱、進度說明、負責人、狀態、期限、備註。
+  - 「個案名稱」取項目第一個全形冒號前的文字；「負責人」取句尾半形括號內的姓名。
+  - **欄位為暫定版本**，待使用者提供實際 Excel 範本後調整 `HEADERS` 與 `COL_WIDTHS`。
