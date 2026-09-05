@@ -1,0 +1,7 @@
+# 打包產物，由 scripts/pack_skill.sh 隨時重建，避免與 .claude/skills/ 內容不同步
+output/*.skill
+
+__pycache__/
+*.pyc
+.DS_Store
+~$*

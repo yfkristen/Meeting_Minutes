@@ -1,96 +1,101 @@
-# Meeting Minutes 會議記錄產出流程
+# Meeting Minutes 會議紀錄產出流程
 
-此 repo 用於將「會議錄音檔的逐字稿文字」轉換成正式的「會議記錄」。
+此 repo 用於將 PMO 例會的逐字稿轉成正式會議紀錄，並產出兩份交付檔：
+**Word 會議紀錄**與 **Excel 任務追蹤表**。
+
+## 撰寫規則以 skill 為準
+
+會議紀錄的格式、選材、語體、錯字校正等所有撰寫規則，一律以
+`.claude/skills/ai-pmo-meeting-minutes/` 底下的 skill 為準：
+
+- `SKILL.md`：主規則
+- `references/術語與人名校正表.md`：語音轉檔錯字與人名對照
+- `references/範例對照.md`：完整逐字稿與定稿對照
+
+**動筆前先讀完 SKILL.md 與兩份 reference。** 本檔只規範檔案放哪裡、交付檔怎麼產，
+不重複 skill 的內容；兩者若有出入，以 skill 為準。
+
+skill 有更新時用 `bash scripts/pack_skill.sh` 打包成 `.skill` 檔重新上傳 claude.ai，
+上傳方式見 `docs/skill維護說明.md`。
 
 ## 目錄結構
 
 ```
-transcripts/   會議逐字稿原文（使用者提供，原封不動保存）
-minutes/       會議正式稿（Markdown，草稿與定稿）
-output/word/   由正式稿產出的 Word 會議紀錄（.docx）
-output/excel/  由正式稿產出的個案進度表（.xlsx）
-reference/     已定稿的範例配對（逐字稿 + 最終版會議記錄），作為格式與風格的依據
-templates/     會議記錄格式範本
-scripts/       Markdown → Word / Excel 的產出腳本
+transcripts/            會議逐字稿原文（使用者提供，原封不動保存）
+minutes/                會議紀錄本體（Markdown，唯一事實來源）
+tracker/                任務追蹤表的資料來源（長表 CSV）
+output/word/            Word 會議紀錄（.docx）
+output/excel/           Excel 任務追蹤表（.xlsx）
+reference/              歷次定稿的配對存檔
+templates/              會議紀錄格式範本
+scripts/                產出腳本
+docs/                   skill 維護說明
+.claude/skills/         ai-pmo-meeting-minutes skill 本體
 ```
 
-- 逐字稿放 `transcripts/`、正式稿放 `minutes/`，兩者同檔名配對。
-- `minutes/` 的 Markdown 是「唯一事實來源」，Word 與 Excel 都由它產生；要改內容改 Markdown 再重跑腳本，不要直接改 Word。
+`minutes/` 的 Markdown 與 `tracker/` 的 CSV 是唯一事實來源，Word 與 Excel 都由它們產生。
+要改內容改 Markdown / CSV 再重跑腳本，不要直接改 Word 或 Excel，否則下次會被覆蓋。
 
-## 工作流程
+## 每次會議的產出流程
 
-### 階段一：格式校準（建立範本）
-
-1. 使用者提供錄音逐字稿 → 存入 `transcripts/YYYY-MM-DD_會議名稱.md`
-2. Claude 依 `templates/meeting_minutes_template.md` 摘要成會議記錄草稿 → 存入 `minutes/YYYY-MM-DD_會議名稱.md`
-3. 使用者提供人工修改後的**最終版本** → 覆蓋 `minutes/` 中的草稿，並將「逐字稿 + 最終版」複製一份到 `reference/`
-4. Claude 比對草稿與最終版的差異，把學到的格式、用語、詳略程度更新回 `templates/meeting_minutes_template.md` 與本檔案的「風格要點」章節
-
-### 階段二：正式產出
-
-1. 使用者貼上逐字稿（或提供檔案）
-2. Claude：
-   - 將逐字稿存入 `transcripts/`
-   - **先閱讀 `reference/` 內所有範例配對與 `templates/meeting_minutes_template.md`**，掌握格式與風格
-   - 產出會議記錄存入 `minutes/`，並在對話中完整呈現給使用者
-   - 產出兩份交付檔（每次都要產，除非使用者說不用）：
-     - Word 會議紀錄：`python3 scripts/md_to_docx.py minutes/<檔名>.md` → `output/word/<檔名>_會議紀錄.docx`
-     - Excel 個案進度表：`python3 scripts/make_progress_xlsx.py minutes/<檔名>.md` → `output/excel/<檔名>_個案進度.xlsx`
-   - 用 SendUserFile 把兩個檔案傳給使用者
-3. 若使用者有修改，將修改後版本視為新的最終版，回到階段一第 3–4 步持續校準
+1. 使用者貼上或提供逐字稿 → 原封不動存入 `transcripts/YYYY-MM-DD_雙週會.md`
+2. 依 skill「動筆前必須確認的四件事」向使用者取得：**結束時間**、**本次出席狀態**、
+   **Loop 看板現況**（最好是截圖）。這三項逐字稿裡沒有，不要自行推論
+3. 依 skill 撰寫紀錄本體 → 存入 `minutes/YYYY-MM-DD_雙週會.md`
+   - 第一行為會議正式名稱，其下為 壹貳參 → 一二三 → 1. 2. 三層編號
+   - **紀錄本體不含郵件套語**（各位主管好、檢送、敬請參閱、Best,）
+4. 更新 `tracker/task_progress.csv`：本次有進度的任務各補一列
+   - 內容依 skill「會議紀錄與任務追蹤表的分工」：只留節點與下一步，理由留在紀錄
+   - 案名與編號沿用 Loop 看板；本次新增議題接在既有編號之後
+   - 本次未討論的任務**不必補列**，腳本會自動填「本次未討論」
+5. 產出兩份交付檔：
+   ```bash
+   python3 scripts/md_to_docx.py minutes/YYYY-MM-DD_雙週會.md
+   python3 scripts/make_tracker_xlsx.py
+   ```
+6. 在對話中完整呈現紀錄全文與郵件套語，並用 SendUserFile 把兩個檔案傳給使用者
+7. 使用者回修改後的定稿 → 覆蓋 `minutes/`，配對存入 `reference/YYYY-MM-DD_雙週會/`，
+   並把學到的規則補進 skill（不是補進本檔）
 
 ## 固定會議資訊
 
-- **雙週會**：每兩週召開一次（週三），例如 2026-07-23、2026-08-06、2026-08-20…
-- 使用者貼逐字稿時若未註明日期，預設為最近一次雙週會的日期，並向使用者確認
-- 檔名使用「雙週會」作為會議名稱，例如 `2026-08-06_雙週會.md`
+- **雙週會**：每兩週一次，週四召開，例如 2026-07-23、2026-08-06、2026-08-20…
+- 會議正式名稱：**金控AI推動委員會PMO待辦事項討論例會**
+- 使用者未註明日期時，預設為最近一次雙週會，並向使用者確認
+- 與會人員名單沿用前次；**出席狀態（誰請假、誰列席）必須每次重新確認，不可沿用**
 
 ## 檔名規則
 
-- 一律使用 `YYYY-MM-DD_會議名稱` 格式，例如 `2026-08-06_產品週會.md`
-- 逐字稿與對應的會議記錄使用相同檔名，分別放在 `transcripts/` 與 `minutes/`
-- 若使用者未提供會議日期，向使用者確認；未提供會議名稱時，從逐字稿內容推斷並與使用者確認
+- 一律 `YYYY-MM-DD_會議名稱`，雙週會固定用「雙週會」，例如 `2026-08-06_雙週會.md`
+- 逐字稿與會議紀錄同檔名，分別放 `transcripts/` 與 `minutes/`
 
-## 產出原則
+## 交付檔產出
 
-- 使用繁體中文（台灣用語）
-- 忠於逐字稿內容，不添加逐字稿中沒有的資訊；聽不清楚或語意不明處以「（待確認）」標註
-- 口語轉為書面語，去除贅詞、重複與離題閒聊
-- 決議事項與待辦事項（負責人、期限）務必完整擷取，這是會議記錄最重要的部分
-- 發言人姓名依逐字稿標示；若逐字稿未區分發言人，不要憑空指派
+環境需求：`pip install python-docx openpyxl`
 
-## 風格要點（隨最終版本回饋持續更新）
+### Word 會議紀錄
 
-依據首份定稿範例 `reference/2026-07-23_雙週會/` 歸納：
+```bash
+python3 scripts/md_to_docx.py minutes/2026-08-06_雙週會.md          # 只有紀錄本體
+python3 scripts/md_to_docx.py minutes/2026-08-06_雙週會.md --email  # 連郵件套語一起
+```
 
-1. **開頭固定**：
-   ```
-   各位主管好：
+- 輸出 `output/word/<檔名>_會議紀錄.docx`
+- 版面設定（字型、字級、行距、邊界）集中在 `md_to_docx.py` 檔頭常數
+- 依編號層級自動套縮排與凸排：壹貳參粗體、一二三次階、1.2. 再次階
+- md 裡若殘留郵件套語會自動略過；`--email` 的日期由檔名推算、會議名稱取第一行
 
-   檢送{YYYY/MM/DD(週別)}「{完整會議名稱}」會議紀錄，敬請參閱。
-   ```
-   雙週會全名為「金控AI推動委員會PMO待辦事項討論例會」。
-2. **大項結構**：壹＝會議時間、貳＝與會人員、參＝討論議題與會議紀要。會議「目的」與「安排」放在「參」底下的一、二，不獨立成壹貳。
-3. **編號層級**：大項用「壹、貳、參」；其下用「一、二、三」；再下用「1. 2.」。
-4. **會議時間格式**：`2026/7/23(四) PM4:00-5:20`（用 PM/AM、冒號、半形連字號）。
-5. **與會人員**：全名頓號分隔；請假者括號註記原因，如 `歐黛瑩(會議衝堂請假)`。
-6. **各案進度**：每項結尾用半形括號標註負責人，如 `……後續走向待議。(邱錦瑩)`。
-7. **用語**：正式、公文化，多用並列與四字語；條列句尾常用請託語氣「請各位……」。
-8. **結尾固定**：
-   ```
-   若有任何問題，再請聯繫我，謝謝！
+### Excel 任務追蹤表
 
-   Best,
-   ```
-9. **常見用字校正**：資訊安全用「資安」（非「治安」）；委員會補全名「AI推動委員會」；課程規劃冠月份「8月課程規劃」。
-10. 逐字稿為語音辨識結果，含同音錯字（如 SAK/SAKE=Slack、TS=Teams、TR=Trae、繳卷=繳交、治安=資安），產出時須依上下文校正為正確詞彙。
+```bash
+python3 scripts/make_tracker_xlsx.py
+```
 
-> 收到後續會議的新定稿時，於 `reference/` 新增配對並補充或修訂本節。
-
-## 交付檔產出（Word / Excel）
-
-- 環境需求：`pip install python-docx openpyxl`
-- Word 版面設定（字型、字級、行距）集中在 `scripts/md_to_docx.py` 檔頭常數，要調整改那裡即可。
-- Excel 取 `minutes/` 中「各案進度」章節的編號項目，逐項拆成：編號、個案名稱、進度說明、負責人、狀態、期限、備註。
-  - 「個案名稱」取項目第一個全形冒號前的文字；「負責人」取句尾半形括號內的姓名。
-  - **欄位為暫定版本**，待使用者提供實際 Excel 範本後調整 `HEADERS` 與 `COL_WIDTHS`。
+- 資料來源 `tracker/task_progress.csv`（長表，一列＝某任務在某次會議的進度）
+  ```
+  編號,任務名稱,負責人,會議日期,狀態,本次進度
+  ```
+- 輸出 `output/excel/PMO任務追蹤表.xlsx`，一列一任務、各次會議進度並排
+- 任務名稱、負責人、狀態取該任務**最近一次**會議的值
+- 某次未討論者自動填「本次未討論」；任務成案前的欄位留白
+- 狀態欄依「已完成／進行中／籌備中／暫緩」自動上色，欄位名稱要改就改腳本檔頭常數
