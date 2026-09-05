@@ -33,7 +33,8 @@ LINE_SPACING = 1.5
 
 LEVEL1 = re.compile(r"^[壹貳參肆伍陸柒捌玖拾]+、")   # 壹、貳、參
 LEVEL2 = re.compile(r"^[一二三四五六七八九十]+、")    # 一、二、三
-LEVEL3 = re.compile(r"^\d+\.\s*")                     # 1. 2. 3.
+LEVEL3 = re.compile(r"^(?:\d+\.|\(\d+\))\s*")       # 1. 2. 3. 或 (1) (2)
+BULLET = re.compile(r"^[*\-\u2022]\s+")                # * - 項目符號
 MAIL_HEAD = ("各位主管好", "檢送")
 MAIL_TAIL = ("若有任何問題", "Best,")
 WEEKDAYS = "一二三四五六日"
@@ -131,8 +132,11 @@ def build(md_path: Path, out_path: Path, *, with_email: bool = False) -> Path:
             add_para(doc, line, bold=True, hanging_cm=1.2, space_before=6)
         elif LEVEL2.match(line):               # 一、二、三
             add_para(doc, line, indent_cm=0.85, hanging_cm=1.2)
-        elif LEVEL3.match(line):               # 1. 2. 3.
+        elif LEVEL3.match(line):               # 1. 2. 3. 或 (1) (2)
             add_para(doc, line, indent_cm=1.7, hanging_cm=0.9)
+        elif BULLET.match(line):               # 項目符號 → ‧
+            add_para(doc, "‧" + BULLET.sub("", line),
+                     indent_cm=2.6, hanging_cm=0.5, space_after=4)
         else:
             add_para(doc, line)
 
